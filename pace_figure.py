@@ -2,10 +2,9 @@
 # author : Erin Thomas ethomas@lanl.gov
 # last updated: May 19, 2025
 #
-# TO use: run this python script within the E3SM 'timing' directory that contains the 
-# 'e3sm_timing.RUN_NAME.*' file
-#  for example:
-#  python ~/PATH_TO_THIS_SCRIPT_/pace_figure.py e3sm_timing.RUN_NAME.file
+# TO use: run this python script within the timing directory that contains the 
+# 'e3sm_timing.RUN_NAME.*' file as follows:
+#  python ~/PATH_TO_SCRIPT_LOCATION/pace_figure.py e3sm_timing_file_name
 #
 
 import matplotlib.pyplot as plt
@@ -28,7 +27,7 @@ with open(path+'/'+infile, "r") as f:
     content = f.read()
     
 # Extract runtimes for each component
-components = ['CPL', 'ATM', 'ICE', 'LND', 'OCN', 'WAV','ROF']
+components = ['LND','ICE','ATM','CPL','ROF','OCN', 'WAV']
 runtime = {}
 for comp in components:
     match = re.search(rf"{comp} Run Time\s*:\s*([\d.]+)\s*seconds", content)
@@ -77,68 +76,39 @@ colors = {
 # Create plot
 fig, ax = plt.subplots(figsize=(10, 6))
 
-# Track vertical stacking (start from 0)
-stack_bottom = 0
-ice_height = runtime['ICE']
-atm_height = runtime['ATM']
-cpl_height = runtime['CPL']
-lnd_height = runtime['LND']
-rof_height = runtime['ROF']
-wav_height = runtime['WAV']
-ocn_height = runtime['OCN']
 
-# First, draw base layer components
-base_components = ['ICE', 'LND', 'OCN', 'WAV']
-for comp in base_components:
+y_start = 0
+rootpe_prev = 0
+for comp in components:
     x_start, x_end = processor_ranges[comp]
     width = x_end - x_start
     height = runtime[comp]
-    rect = Rectangle((x_start, 0), width, height, color=colors[comp])
-    ax.add_patch(rect)
-    ax.text(x_start + width/2, height/2, comp, ha='center', va='center', fontsize=14, fontweight='bold')
-
-# Draw ROF layer above LND
-base_rof = lnd_height
-rof_rect = Rectangle((processor_ranges['ROF'][0], base_rof),
-                     processor_ranges['ROF'][1] - processor_ranges['ROF'][0],
-                     rof_height, color=colors['ROF'])
-ax.add_patch(rof_rect)
-ax.text((processor_ranges['ROF'][1] + processor_ranges['ROF'][0]) / 2,
-        lnd_height + rof_height/2, 'ROF', ha='center', va='center', fontsize=14, fontweight='bold')
-
-
-# Draw ATM layer above ICE
-base_atm = max(lnd_height+rof_height, ice_height)
-atm_rect = Rectangle((processor_ranges['ATM'][0], base_atm),
-                     processor_ranges['ATM'][1] - processor_ranges['ATM'][0],
-                     atm_height, color=colors['ATM'])
-ax.add_patch(atm_rect)
-ax.text((processor_ranges['ATM'][1] + processor_ranges['ATM'][0]) / 2,
-        base_atm + atm_height/2, 'ATM', ha='center', va='center', fontsize=14, fontweight='bold')
-
-# Draw CPL layer above ATM
-base_cpl = base_atm + atm_height
-cpl_rect = Rectangle((processor_ranges['CPL'][0], base_cpl),
-                     processor_ranges['CPL'][1] - processor_ranges['CPL'][0],
-                     cpl_height, color=colors['CPL'])
-ax.add_patch(cpl_rect)
-ax.text((processor_ranges['CPL'][1] + processor_ranges['CPL'][0]) / 2,
-        base_cpl + cpl_height/2, 'CPL', ha='center', va='center', fontsize=14, fontweight='bold')
-
-height_labels= [0,base_atm,base_cpl,ocn_height,wav_height,base_cpl+cpl_height] 
-height_labels = sorted(height_labels)
+    if x_start == rootpe_prev:
+        rect = Rectangle((x_start, y_start), width, height, color=colors[comp])
+        ax.add_patch(rect)
+        ax.text(x_start + width/2, y_start+height/2, comp, ha='center', va='center', fontsize=14, fontweight='bold')
+        y_start = y_start+height
+    else:
+        y_start=0
+        rect = Rectangle((x_start, y_start), width, height, color=colors[comp])
+        ax.add_patch(rect)
+        ax.text(x_start + width/2, y_start+height/2, comp, ha='center', va='center', fontsize=14, fontweight='bold')
+        
+        
+    rootpe_prev = x_start
+    y_start_prev = y_start
 
 # Plot settings
 ax.set_xlim(0, processor_ranges['WAV'][1])
-ax.set_ylim(0, wav_height+200)
+ax.set_ylim(0, runtime['WAV']+200)
 ax.set_xlabel("Processor #")
 ax.set_ylabel("Simulation Time (s)")
 ax.set_xticks(pe_labels)
-ax.set_yticks(height_labels)
+#ax.set_yticks(height_labels)
 
 ax.set_facecolor('lightgray')
 ax.spines[['top', 'right']].set_visible(False)
 
-plt.xticks(rotation=45)
+plt.xticks(rotation=40)
 plt.savefig(path+'/'+outfile)
 plt.show()
